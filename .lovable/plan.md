@@ -141,6 +141,32 @@ Access rules:
 - The dataset filter drops draft, in_review, archived and disallowed-purpose items.
 - An audit row built from a request never contains the payload or secret fields.
 
+
+## Final security and accuracy requirements
+- **Server address protection (SSRF):** The server checks `DATA_HUB_API_URL` on every call.
+  - It must use https on the default port, with no user or password in the address.
+  - The host must be a public domain name, not a raw IP. `localhost`, `*.local`, `*.internal` and `*.localhost` are rejected.
+  - The host is looked up over DNS-over-HTTPS (A and AAAA records). The call is refused if any answer is in a blocked range: 127/8, 10/8, 172.16/12, 192.168/16, 169.254/16, 100.64/10, 0/8, ::1, fc00::/7, fe80::/10, or IPv4-mapped forms.
+  - Redirects are refused (`redirect: "manual"`; any 3xx counts as `sync_failed / unexpected_redirect`).
+  - **Limitation:** the server runtime cannot pin the address it connects to, so DNS rebinding is reduced but not fully closed. The rest of the protection comes from the redirect ban and the platform's own outbound network isolation, which already blocks internal addresses.
+- **Atomic rate limit:** A database function `data_hub_take_slot()` reserves one call. It locks the admin's own row in `integration_rate_limits` (`SELECT … FOR UPDATE` inside one statement), resets the window after 60 s, and then increments the counter or refuses.
+  - Parallel requests queue on that row lock, so they can't get past 30 calls per minute.
+  - The function runs as SECURITY DEFINER, checks `has_role(auth.uid(),'admin')`, and can only be run by signed-in users.
+- **Health check vs sync:** These are stored and shown separately.
+  - «Последняя успешная проверка связи» comes from a `health_check` event.
+  - «Последняя успешная синхронизация данных» comes only from a full, schema-valid dataset or model list. A health check never counts as a sync.
+  - Before the first sync, the panel shows «Синхронизация ещё не выполнялась».
+- **Error responses:** Error bodies are validated against the shared schema too. A malformed error body becomes `invalid_error_response`.
+  - The browser gets only a known code, a fixed Russian message and the request_id.
+  - Raw server text, stack traces, headers and secrets are logged on the server only, with secrets removed, and never sent to the browser.
+- **Append-only audit log:** Nobody, including administrators, can change or remove audit rows.
+  - `integration_events` gives update and delete rights to no one.
+  - It has no update or delete policies.
+  - A trigger rejects any UPDATE or DELETE, even from the service role.
+  - Direct inserts from the browser are also blocked. Rows are written only by the SECURITY DEFINER function `data_hub_log_event(...)`, which checks the admin role and sets `actor_id = auth.uid()` itself.
+
+Added to the checklist (step 1 and the tests): the `integration_rate_limits` table and functions, the URL and IP checks, the redirect ban, parallel rate-limit tests (31 calls at the same time give exactly 30 allowed), tests that update and delete are refused on the audit log, the error-body schema test, and a test that health-check-only results show no sync.
+
 ## Implementation checklist
 1. Add the migration for `integration_events` (grants, RLS: admin select, admin insert of their own rows only, no update or delete).
 2. Write `src/lib/data-hub.ts`: schemas, states, error mapping, filter, retry helper.
