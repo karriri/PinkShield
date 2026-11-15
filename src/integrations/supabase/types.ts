@@ -313,6 +313,66 @@ export type Database = {
           },
         ]
       }
+      integration_events: {
+        Row: {
+          actor_id: string
+          attempt: number
+          created_at: string
+          duration_ms: number
+          http_status: number | null
+          id: string
+          is_sync: boolean
+          job_id: string | null
+          operation: string
+          outcome: string
+          request_id: string
+        }
+        Insert: {
+          actor_id: string
+          attempt?: number
+          created_at?: string
+          duration_ms?: number
+          http_status?: number | null
+          id?: string
+          is_sync?: boolean
+          job_id?: string | null
+          operation: string
+          outcome: string
+          request_id: string
+        }
+        Update: {
+          actor_id?: string
+          attempt?: number
+          created_at?: string
+          duration_ms?: number
+          http_status?: number | null
+          id?: string
+          is_sync?: boolean
+          job_id?: string | null
+          operation?: string
+          outcome?: string
+          request_id?: string
+        }
+        Relationships: []
+      }
+      integration_rate_limits: {
+        Row: {
+          actor_id: string
+          count: number
+          window_start: string
+        }
+        Insert: {
+          actor_id: string
+          count?: number
+          window_start?: string
+        }
+        Update: {
+          actor_id?: string
+          count?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       moderation_actions: {
         Row: {
           action: string
@@ -532,6 +592,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      data_hub_log_event: {
+        Args: {
+          _attempt: number
+          _duration_ms: number
+          _http_status: number
+          _is_sync: boolean
+          _job_id: string
+          _operation: string
+          _outcome: string
+          _request_id: string
+        }
+        Returns: undefined
+      }
+      data_hub_take_slot: { Args: never; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

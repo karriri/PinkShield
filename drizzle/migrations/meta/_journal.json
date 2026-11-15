@@ -15,6 +15,20 @@
       "when": 1794734747641,
       "tag": "0001_guidance_library",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794736034168,
+      "tag": "0002_data_hub_integration_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794736116249,
+      "tag": "0003_integration_events_function_only_inserts",
+      "breakpoints": true
     }
   ]
 }

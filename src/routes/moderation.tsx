@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth, useIsAdmin } from "@/lib/auth";
 import { Textarea } from "@/components/ui/textarea";
 import { useGuidance } from "@/lib/guidance";
+import { DataHubPanel } from "@/components/data-hub-panel";
 import { REPORT_REASONS, type ReportReason } from "@/lib/community";
 
 export const Route = createFileRoute("/moderation")({
@@ -77,7 +78,7 @@ function Dashboard() {
     <>
       <PageHeader title="Модерация" subtitle="Жалобы участниц, действия с контентом и история решений. Кто отправил жалобу, авторам не показывается." />
       <Tabs defaultValue="reports">
-        <TabsList><TabsTrigger value="reports">Жалобы</TabsTrigger><TabsTrigger value="restrictions">Ограничения</TabsTrigger><TabsTrigger value="history">История</TabsTrigger><TabsTrigger value="guidance">Справочные тексты</TabsTrigger></TabsList>
+        <TabsList><TabsTrigger value="reports">Жалобы</TabsTrigger><TabsTrigger value="restrictions">Ограничения</TabsTrigger><TabsTrigger value="history">История</TabsTrigger><TabsTrigger value="guidance">Справочные тексты</TabsTrigger><TabsTrigger value="data-hub">Интеграция Data Hub</TabsTrigger></TabsList>
         <TabsContent value="reports" className="mt-4 grid gap-3">
           <div className="flex gap-2">
             <Button size="sm" variant={status === "open" ? "default" : "outline"} onClick={() => setStatus("open")}>Открытые ({(reports.data ?? []).filter((r) => r.status === "open").length})</Button>
@@ -142,6 +143,7 @@ function Dashboard() {
           ))}
         </TabsContent>
         <TabsContent value="guidance" className="mt-4"><GuidanceAdmin /></TabsContent>
+        <TabsContent value="data-hub" className="mt-4"><DataHubPanel /></TabsContent>
       </Tabs>
     </>
   );
