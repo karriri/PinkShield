@@ -18,17 +18,19 @@ Full search over large documents is more complex than this MVP needs. A small, s
 - Everyone can read it. Only admins can edit it, so guidance can change without touching the AI.
 - The AI only rephrases the statements it is given. It never makes up a schedule or an age range.
 
-Planned starting sources (I verify each link and the exact wording before adding it):
-- Kazakhstan Ministry of Health Order No. ҚР ДСМ-174/2020 on screening target groups, as amended. The breast screening group is women 40–70, every 2 years [1](https://www.cancercenter.kz/ru/chto-takoe-skrining). There is an amendment from 29 July 2025 (No. 71) [4](http://insecure.zan.kz/rus/docs/V2500036536), and a regional health office now says 40–76 [3](https://www.gov.kz/memleket/entities/almaty-densaulyk/press/news/details/1261143). **These sources disagree.** I will read the official amended text before writing the age range. If I cannot confirm it, the app shows both versions and asks the user to check with her clinic.
-- WHO, NCI and ACR/ACS for symptoms that need a doctor, family history, mammography and BI-RADS. They are labeled as international guidance and never replace the Kazakhstan rule.
+Starting sources:
+- **Kazakhstan (primary, current):** Order No. ҚР ДСМ-174/2020 as amended on 29 July 2025 (No. 71). Women who turn 40, 42, 44 ... 76 are screened once every two years, in the matching even-numbered years. Official text: https://zan.gov.kz/api/documents/212907/rus/download/pdf, plus the Ministry guidance page https://www.gov.kz/situations/331/858?lang=ru. The library stores the source, the date I checked it, who it applies to (women 40–76, even ages) and the interval (every 2 years). The older 40–70 range is kept only as an archived version and is never shown as current.
+- **International (WHO, NCI, ACR/ACS):** used for what changes need a doctor's check, family history, mammography and BI-RADS. They are labeled as international and never replace the Kazakhstan rule.
+- Every result also explains that being in the screening age group is not the same as a personal medical recommendation.
 
 ## 3. Персональный навигатор здоровья груди
-Six optional questions. Each has "Не знаю" or "Пропустить" and a short note on why it is asked: age; new or unusual breast changes; past breast exams; roughly when the last one was; family history of breast or ovarian cancer; known inherited mutation or previously told "higher risk".
+Seven optional questions. Each has "Не знаю" or "Пропустить" and a short note on why it is asked: age; new or unusual breast changes; past breast exams; roughly when the last one was; whether she is already under a doctor's follow-up (past breast cancer, an existing breast condition being followed, a past abnormal result, or a known high-risk finding); family history of breast or ovarian cancer; known inherited mutation or previously told "higher risk".
 
 Fixed rules decide the result. The AI may only explain it in simpler words. Results can combine:
-- **B. New change reported**: see a doctor now, at any age. Don't wait for routine screening, and a past normal exam doesn't rule it out. If it is getting worse quickly, seek urgent care. This result always appears first.
+- **B. New or unusual change reported**: calm wording advising a professional medical check of this change, without waiting for the next routine screening, at any age. A past normal exam does not rule a new change out. No guesses about what the change is, and no urgency levels unless reviewed guidance supports them. This result always appears first.
+- **E. Already under medical follow-up**: if she reports past breast cancer, a condition being followed, a past abnormal result or a known high-risk finding, she is not sent down the routine screening path. Her follow-up plan is set by her own doctor.
 - **C. Family history, mutation or prior high-risk finding**: an individual risk assessment with a specialist may be appropriate. This does not mean cancer.
-- **A. Routine screening**: shown only when age is given. It says whether the age is inside the confirmed Kazakhstan screening group and to agree timing with the clinic. No dates are calculated. If the last exam date is unknown, it says so.
+- **A. Routine screening**: shown only when age is given and E does not apply. It says whether the age is inside the confirmed Kazakhstan screening group and to agree timing with the clinic. No dates are calculated. If the last exam date is unknown, it says so.
 - **D. Not enough information**: lists what is missing and gives no personal conclusion.
 
 Each result card shows: what you told us, what the guidance says, the suggested next step, why you see this, the source (organization, link, date), and its limits. The navigator never says "you are healthy", "no need for a doctor", a percentage, a diagnosis or a treatment.
@@ -42,7 +44,7 @@ New result sections:
 - **Объяснение простыми словами**: the summary plus BI-RADS, shown only if it is written in the text.
 - **Что можно уточнить у врача**: questions, plus anything missing or uncertain in the report.
 
-Checks before showing a result: every finding, recommendation and passage must be found in the source text, otherwise it is dropped. The rule-based backup adds recommendations the AI missed. Diet items carry a note that they are not cancer treatment. Requests for a diagnosis, a skipped exam or "is it cancer" get a refusal explaining the limits. If she describes a symptom, she is told to see a doctor, and an old normal report is never used as reassurance.
+Checks before showing a result: every finding, recommendation and passage must be found in the source text, otherwise it is dropped. The rule-based backup adds missed recommendations, but only explicit instructions; conditional or uncertain wording is labeled, and descriptions and negations are not counted. Diet items carry a note that they are not cancer treatment. Requests for a diagnosis, a skipped exam or "is it cancer" get a refusal explaining the limits. If she describes a symptom, she is told to see a doctor, and an old normal report is never used as reassurance.
 
 ## 5. Tests
 Automated rule tests:
@@ -51,7 +53,7 @@ Automated rule tests:
 - I'll run a few live AI checks with attempts to make it diagnose or invent findings, and report what I saw. Passing tests does not mean the tool is medically validated.
 
 ## Risks and limits
-- The age range depends on confirming the 2025 Kazakhstan amendment.
+- Guidance must be re-checked whenever the Kazakhstan order changes; the "date checked" is shown to users.
 - The guidance texts I write need review by a doctor before real use.
 - The AI wording is checked by rules but not clinically validated.
 - No push notifications, PDF reading or image analysis.
@@ -59,5 +61,8 @@ Automated rule tests:
 ## Technical details
 - New tables `guidance_sources` and `guidance_statements`, readable by everyone, editable by admins only via `has_role`, with the reviewed statements added in the migration.
 - `src/lib/navigator.ts`: a pure rules function that takes the answers and active statements and returns result cards with statement ids. It is unit tested.
-- A server function sends only the chosen statement texts to the AI for an optional plainer explanation, and the output is checked to contain no numbers or ages that are not in those statements.
+- A server function sends only the chosen statement texts to the AI for an optional plainer explanation. Checks before it is shown: every number, age, interval and instruction verb must also be in the approved statement; no new medical instructions; the meaning is kept (a second check pass by the model scores faithfulness, plus rule checks). If any check fails, the original approved statement is shown instead. The source line is always shown under the card, whatever the AI returns.
+- Recommendations found by the rule-based backup are classed as: explicit instruction (shown as a doctor's recommendation), conditional ("при появлении…", "в случае…"), uncertain ("возможно", "может потребоваться", shown with "уточните у врача"), or a general description or negation (not shown as a recommendation). The full original sentence is kept as the passage.
+- Tests cover false matches (for example "рекомендуемая доза облучения соблюдена" or "следует отметить, что…"), negations ("не рекомендовано", "образований не выявлено") and unclear wording.
+- Admins can edit guidance sources and statements on the moderation page; each edit creates a new version.
 - Report schema gains `exam_type`, `findings[{text, passage}]`, `recommendations[{text, kind, passage, explanation, ambiguous}]` and `uncertainties[]`. Passages are checked with `locateQuote`.
