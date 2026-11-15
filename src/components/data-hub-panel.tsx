@@ -40,11 +40,11 @@ export function DataHubPanel() {
   async function check() {
     setBusy(true);
     try {
-      const h = await readFn({ data: { op: "health_check", params: {} } });
+      const h: HubResponse = await readFn({ data: { op: "health_check", params: {} } });
       setLast(h);
       if (h.state === "connected") {
-        const d = await readFn({ data: { op: "list_datasets", params: { limit: 50 } } });
-        const m = await readFn({ data: { op: "list_models", params: { limit: 50 } } });
+        const d: HubResponse = await readFn({ data: { op: "list_datasets", params: { limit: 50 } } });
+        const m: HubResponse = await readFn({ data: { op: "list_models", params: { limit: 50 } } });
         setDatasets(d.state === "connected" ? ((d.data as { items: never[] }).items) : null);
         setModels(m.state === "connected" ? ((m.data as { items: never[] }).items) : null);
         if (d.state !== "connected") setLast(d); else if (m.state !== "connected") setLast(m);

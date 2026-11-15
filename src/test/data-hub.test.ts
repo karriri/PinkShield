@@ -19,7 +19,7 @@ const call = (fetchFn: typeof fetch, extra: object = {}) =>
 const mlBody = { job_id: JOB, experiment_name: "e", dataset_id: ds().id, version: "1", split_id: ds().id, model_type: "lr", params: {} };
 
 function ctx(isAdmin: boolean, slot = true) {
-  const calls: { fn: string; args?: Record<string, unknown> }[] = [];
+  const calls: { fn: string; args?: Record<string, unknown> | undefined }[] = [];
   return {
     calls,
     ctx: { userId: "u1", supabase: { rpc: async (fn: string, args?: Record<string, unknown>) => {
@@ -114,14 +114,14 @@ describe("Responses, errors and retries", () => {
     expect(sleep).toHaveBeenCalledWith(5000);
   });
   it("POST retries reuse the same Idempotency-Key and body; 422 is not retried", async () => {
-    const seen: { key: string | null; body: string }[] = [];
+    const seen: { key: string | undefined; body: string }[] = [];
     const seq = [json(500, errBody("internal_error")), json(202, { job_id: JOB, status: "queued", created_at: "2026-11-15T00:00:00Z" })];
     const f = async (_u: string, init: RequestInit) => { seen.push({ key: (init.headers as Record<string, string>)["idempotency-key"], body: String(init.body) }); return seq.shift()!; };
     const r = await call(f as never, { op: "create_ml_job", path: "/api/data-hub/ml-jobs", body: mlBody, jobId: JOB });
     expect(r.ok).toBe(true);
     expect(seen).toHaveLength(2);
     expect(seen[0]).toEqual(seen[1]);
-    expect(seen[0].key).toBe(JOB);
+    expect(seen[0]?.key).toBe(JOB);
     const g = vi.fn(async () => json(422, errBody("validation_failed")));
     await call(g as never, { op: "create_ml_job", path: "/api/data-hub/ml-jobs", body: mlBody, jobId: JOB });
     expect(g).toHaveBeenCalledTimes(1);

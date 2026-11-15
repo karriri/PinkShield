@@ -135,13 +135,13 @@ export function isBlockedIp(ip: string): boolean {
   if (v.includes(":")) {
     if (v === "::" || v === "::1") return true;
     const mapped = v.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mapped) return isBlockedIp(mapped[1]);
+    if (mapped?.[1]) return isBlockedIp(mapped[1]);
     if (/^::ffff:/.test(v) || /^64:ff9b:/.test(v)) return true;
     return /^f[cd]/.test(v) || /^fe[89ab]/.test(v) || /^ff/.test(v) || /^2001:db8/.test(v) || /^::/.test(v);
   }
   const parts = v.split(".").map(Number);
   if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
-  const [a, b] = parts;
+  const a = parts[0] ?? 0, b = parts[1] ?? 0;
   return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
     || (a === 100 && b >= 64 && b <= 127) || (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19)) || a >= 224;
 }
@@ -160,12 +160,12 @@ export async function checkHostResolvesPublic(host: string, fetchFn: typeof fetc
 
 /* ---------- calling with retries ---------- */
 export type CallOk<T = unknown> = { ok: true; data: T; status: number; attempts: number };
-export type CallErr = { ok: false; state: Exclude<ConnectionState, "connected" | "sync_in_progress">; code: string; status: number | null; attempts: number; requestId?: string };
+export type CallErr = { ok: false; state: Exclude<ConnectionState, "connected" | "sync_in_progress">; code: string; status: number | null; attempts: number; requestId?: string | undefined };
 export type CallResult<T = unknown> = CallOk<T> | CallErr;
 
 export type CallOptions = {
-  baseUrl: URL; secret: string; op: Operation; path: string; body?: unknown; jobId?: string; requestId: string;
-  fetchFn: typeof fetch; sleep?: (ms: number) => Promise<void>; timeoutMs?: number; maxRetries?: number; random?: () => number;
+  baseUrl: URL; secret: string; op: Operation; path: string; body?: unknown; jobId?: string | undefined; requestId: string;
+  fetchFn: typeof fetch; sleep?: ((ms: number) => Promise<void>) | undefined; timeoutMs?: number | undefined; maxRetries?: number; random?: () => number;
 };
 
 const NO_RETRY = new Set([400, 401, 403, 404, 409, 413, 415, 422]);
@@ -190,7 +190,7 @@ export async function callDataHub<T = unknown>(o: CallOptions): Promise<CallResu
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), o.timeoutMs ?? 10_000);
     try {
-      const res = await o.fetchFn(url.toString(), { method: isPost ? "POST" : "GET", headers, body: bodyText, redirect: "manual", signal: ctrl.signal });
+      const res = await o.fetchFn(url.toString(), { method: isPost ? "POST" : "GET", headers, ...(bodyText !== undefined ? { body: bodyText } : {}), redirect: "manual", signal: ctrl.signal });
       const text = await res.text();
       clearTimeout(timer);
       if (res.status >= 300 && res.status < 400) return { ok: false, state: "sync_failed", code: "unexpected_redirect", status: res.status, attempts: attempt };
@@ -216,7 +216,7 @@ export async function callDataHub<T = unknown>(o: CallOptions): Promise<CallResu
       clearTimeout(timer);
       last = { ok: false, state: "sync_failed", code: ctrl.signal.aborted ? "timeout" : "network_error", status: null, attempts: attempt };
     }
-    if (attempt <= max) await sleep(retryAfterMs ?? [500, 1500][attempt - 1] + Math.floor(rnd() * 250));
+    if (attempt <= max) await sleep(retryAfterMs ?? ([500, 1500][attempt - 1] ?? 1500) + Math.floor(rnd() * 250));
   }
   return last;
 }
@@ -257,7 +257,7 @@ export type AuditRow = { _operation: Operation; _job_id: string | null; _request
 const SYNC_OPS: Operation[] = ["list_datasets", "list_models"];
 
 /** Builds the only fields that ever reach the audit log: no bodies, names, paths or secrets. */
-export function buildAuditRow(op: Operation, r: CallResult, meta: { jobId?: string; requestId: string; durationMs: number }): AuditRow {
+export function buildAuditRow(op: Operation, r: CallResult, meta: { jobId?: string | undefined; requestId: string; durationMs: number }): AuditRow {
   return {
     _operation: op, _job_id: meta.jobId ?? null, _request_id: meta.requestId, _http_status: r.ok ? r.status : r.status,
     _outcome: r.ok ? "ok" : r.code.replace(/[^a-z_]/g, "").slice(0, 40) || "error",
@@ -280,8 +280,8 @@ export function stateFor(r: CallResult): ConnectionState { return r.ok ? "connec
 /* ---------- orchestration (injectable for tests) ---------- */
 type Rpc = (fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }>;
 export type HubCtx = { supabase: { rpc: Rpc } | any; userId: string };
-export type HubResponse = { state: ConnectionState; code: string | null; message: string | null; requestId: string | null; data: unknown };
-export type HubDeps = { env: { url?: string; secret?: string }; fetchFn: typeof fetch; sleep?: (ms: number) => Promise<void>; timeoutMs?: number; skipDnsCheck?: boolean };
+export type HubResponse = { state: ConnectionState; code: string | null; message: string | null; requestId: string | null; data: any };
+export type HubDeps = { env: { url?: string | undefined; secret?: string | undefined }; fetchFn: typeof fetch; sleep?: ((ms: number) => Promise<void>) | undefined; timeoutMs?: number | undefined; skipDnsCheck?: boolean };
 
 export async function assertAdmin(ctx: HubCtx) {
   const { data, error } = await ctx.supabase.rpc("has_role", { _user_id: ctx.userId, _role: "admin" });
