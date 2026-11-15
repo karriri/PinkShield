@@ -7,3 +7,5 @@
 - [x] Data Hub connection tab, contracts, SSRF/rate-limit/audit safeguards, tests
 - [ ] Add DATA_HUB_API_URL / DATA_HUB_API_SECRET — waiting for the separate Data Hub project
 - [ ] Assign first administrator — waiting for the user's account email
+- [ ] Master prompt stage 1: audit + AI Brain (plan written, awaiting approval)
+- [x] Redesign: moss/rose palette
