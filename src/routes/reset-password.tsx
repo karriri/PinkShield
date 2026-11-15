@@ -25,7 +25,7 @@ function Reset() {
   const navigate = useNavigate();
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (pw.length < 8) return toast.error("Минимум 8 символов");
+    if (pw.length < 8) { toast.error("Минимум 8 символов"); return; }
     const { error } = await supabase.auth.updateUser({ password: pw });
     if (error) toast.error("Ссылка устарела. Запросите новую.");
     else { toast.success("Пароль обновлён"); navigate({ to: "/" }); }

@@ -68,7 +68,7 @@ function ProfilePage() {
           <h2 className={h2}>Настройки</h2>
           <form className="mt-4 grid gap-4" onSubmit={(e) => {
             e.preventDefault(); const n = name.trim();
-            if (n.length < 2) return toast.error("Псевдоним — не короче 2 символов");
+            if (n.length < 2) { toast.error("Псевдоним — не короче 2 символов"); return; }
             save({ pseudonym: n.slice(0, 40) });
           }}>
             <div className="grid gap-2"><Label htmlFor="name">Псевдоним</Label><Input id="name" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />

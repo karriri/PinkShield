@@ -1,6 +1,9 @@
 import type { Recommendation } from "./report-safety";
 export type Explanation = {
   summary: string;
+  examType?: string | null;
+  findings?: string[]; // verbatim from the report
+  uncertainties?: string[]; // what is unclear or not stated
   terms: { term: string; explanation: string }[];
   birads: { category: string; meaning: string } | null;
   recommendations: Recommendation[]; // wording taken from the report, verified

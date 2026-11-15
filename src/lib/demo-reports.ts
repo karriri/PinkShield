@@ -1,9 +1,10 @@
 import type { Explanation } from "./explanation";
 import { BIRADS_MEANING } from "./explanation";
+import { buildRecommendations, detectExamType } from "./report-safety";
 
 export type DemoReport = { id: string; title: string; text: string; explanation: Explanation };
 
-export const DEMO_REPORTS: DemoReport[] = [
+const RAW_DEMOS: DemoReport[] = [
   {
     id: "us-normal",
     title: "УЗИ без изменений",
@@ -88,3 +89,21 @@ export const DEMO_REPORTS: DemoReport[] = [
     },
   },
 ];
+
+const DEMO_FINDINGS: Record<string, string[]> = {
+  "us-normal": ["Узловых образований не выявлено", "Протоки не расширены", "Регионарные лимфоузлы не увеличены", "Эхографических признаков патологии не выявлено"],
+  "mammo-cyst": ["округлое образование с чёткими ровными контурами, 8 мм", "Микрокальцинатов не выявлено", "Простая киста левой молочной железы"],
+  "us-followup": ["гипоэхогенное образование овальной формы, с чёткими контурами, 6×4 мм", "Кровоток не определяется", "Образование правой молочной железы, вероятно доброкачественное (фиброаденома?)"],
+};
+
+/** Demo explanations are deterministic: recommendations and passages are derived from the demo text by the same checks. */
+export const DEMO_REPORTS: DemoReport[] = RAW_DEMOS.map((d) => ({
+  ...d,
+  explanation: {
+    ...d.explanation,
+    examType: detectExamType(d.text),
+    findings: DEMO_FINDINGS[d.id] ?? [],
+    uncertainties: d.id === "us-followup" ? ["Знак вопроса после «фиброаденома» означает предположение врача, а не окончательный вывод."] : [],
+    recommendations: buildRecommendations(d.text, d.explanation.recommendations),
+  },
+}));

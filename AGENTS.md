@@ -30,6 +30,10 @@ use the editor.
 <!-- LOVABLE:END -->
 
 ## PINK SHIELD
-- Planner/community/profile data lives in browser storage via `src/lib/store.ts` (no accounts); report text and AI results are never persisted — keeps sensitive health text off the device.
+- User data (appointments, notifications, community, profile) lives in Lovable Cloud behind accounts and RLS; report text, AI results and navigator answers are never persisted — keeps sensitive health text off servers and devices.
+- Reminders are created/updated by database triggers on appointments using the profile timezone — no duplicates and no client-side scheduling.
+- Admin rights come only from `user_roles` + `has_role` checked in RLS — never trust frontend checks.
+- Navigator results come from pure rules in `src/lib/navigator.ts` over admin-editable, versioned guidance rows (`guidance_statements`/`guidance_sources`); AI may only rephrase a statement via `src/lib/navigator.functions.ts`, checked by `src/lib/guidance-check.ts` plus a model faithfulness check, falling back to the original — keeps guidance traceable.
+- Recommendation extraction classifies each source sentence (explicit/conditional/uncertain vs negated/descriptive) in `report-safety.ts` — avoids false-positive "recommendations".
 - AI report explanations go through `src/lib/report.functions.ts` (server function); its output is post-filtered by `src/lib/report-safety.ts` so BI-RADS, terms and recommendation quotes must appear in the source text — prevents invented findings.
 - Demo reports use prepared explanations in `src/lib/demo-reports.ts` and never call the AI — deterministic demos.

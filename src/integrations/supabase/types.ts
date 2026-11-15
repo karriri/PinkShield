@@ -215,6 +215,104 @@ export type Database = {
           },
         ]
       }
+      guidance_sources: {
+        Row: {
+          checked_on: string
+          country: string
+          id: string
+          organization: string
+          population: string | null
+          published_or_updated: string | null
+          screening_interval: string | null
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          checked_on?: string
+          country?: string
+          id: string
+          organization: string
+          population?: string | null
+          published_or_updated?: string | null
+          screening_interval?: string | null
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          checked_on?: string
+          country?: string
+          id?: string
+          organization?: string
+          population?: string | null
+          published_or_updated?: string | null
+          screening_interval?: string | null
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      guidance_statements: {
+        Row: {
+          active: boolean
+          age_max: number | null
+          age_min: number | null
+          created_at: string
+          even_ages_only: boolean | null
+          id: string
+          interval_years: number | null
+          key: string
+          kind: string
+          reviewed_by: string | null
+          source_id: string
+          text: string
+          topic: string
+          version: number
+        }
+        Insert: {
+          active?: boolean
+          age_max?: number | null
+          age_min?: number | null
+          created_at?: string
+          even_ages_only?: boolean | null
+          id?: string
+          interval_years?: number | null
+          key: string
+          kind?: string
+          reviewed_by?: string | null
+          source_id: string
+          text: string
+          topic: string
+          version?: number
+        }
+        Update: {
+          active?: boolean
+          age_max?: number | null
+          age_min?: number | null
+          created_at?: string
+          even_ages_only?: boolean | null
+          id?: string
+          interval_years?: number | null
+          key?: string
+          kind?: string
+          reviewed_by?: string | null
+          source_id?: string
+          text?: string
+          topic?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guidance_statements_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "guidance_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       moderation_actions: {
         Row: {
           action: string

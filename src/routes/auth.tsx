@@ -56,8 +56,8 @@ function AuthPage() {
   }
   async function signUp(e: FormEvent) {
     e.preventDefault();
-    if (pseudonym.trim().length < 2) return toast.error("Псевдоним — минимум 2 символа");
-    if (password.length < 8) return toast.error("Пароль — минимум 8 символов");
+    if (pseudonym.trim().length < 2) { toast.error("Псевдоним — минимум 2 символа"); return; }
+    if (password.length < 8) { toast.error("Пароль — минимум 8 символов"); return; }
     setBusy(true);
     const { error } = await supabase.auth.signUp({ email, password, options: {
       emailRedirectTo: window.location.origin,
@@ -67,7 +67,7 @@ function AuthPage() {
     if (error) toast.error(error.message); else setSent(true);
   }
   async function reset() {
-    if (!email) return toast.error("Введите почту");
+    if (!email) { toast.error("Введите почту"); return; }
     await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
     toast.success("Если аккаунт существует, мы отправили письмо со ссылкой");
   }

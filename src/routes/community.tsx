@@ -50,8 +50,8 @@ function CommunityPage() {
 
   async function publish() {
     const t = text.trim();
-    if (t.length < 5) return toast.error("Напишите хотя бы пару слов");
-    if (needsRules && !agree) return toast.error("Пожалуйста, подтвердите правила сообщества");
+    if (t.length < 5) { toast.error("Напишите хотя бы пару слов"); return; }
+    if (needsRules && !agree) { toast.error("Пожалуйста, подтвердите правила сообщества"); return; }
     try {
       if (needsRules) { await supabase.from("profiles").update({ rules_accepted_at: new Date().toISOString() }).eq("id", profile!.id); qc.invalidateQueries({ queryKey: ["profile"] }); }
       await act.createPost(cat, t.slice(0, 2000)); setText(""); toast.success("Пост опубликован");

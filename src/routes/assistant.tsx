@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { CERTAINTY_NOTE, REC_KIND_LABEL, REC_KINDS } from "@/lib/report-safety";
+import { Navigator } from "@/components/navigator";
 import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -18,6 +20,8 @@ export const Route = createFileRoute("/assistant")({
       { name: "description", content: "Объясняем медицинские термины из заключений УЗИ и маммографии простым языком и помогаем подготовить вопросы врачу." },
       { property: "og:title", content: "AI-помощник по заключениям — PINK SHIELD" },
       { property: "og:description", content: "Понятные объяснения терминов и BI-RADS. Не ставит диагноз." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AssistantPage,
@@ -121,6 +125,8 @@ function AssistantPage() {
       </div>
 
       {result && <ResultView r={result} />}
+
+      <Navigator />
     </>
   );
 }
@@ -147,37 +153,56 @@ function ResultView({ r }: { r: Explanation }) {
       {r.personalConcern && (
         <div className="flex gap-3 rounded-2xl border border-destructive/30 bg-warning p-4 text-sm text-warning-foreground">
           <AlertCircle className="h-5 w-5 shrink-0" />
-          <p>Похоже, вы описываете новое изменение, которое заметили сами. Пожалуйста, обратитесь к врачу — приложение не может оценить его.</p>
+          <p>Похоже, вы описываете новое изменение, которое заметили сами. Покажите его врачу, не дожидаясь планового обследования: прошлое нормальное заключение не исключает новых изменений, а приложение не может их оценить.</p>
         </div>
       )}
-      <Section icon={Sparkles} title="Кратко о заключении" label="Объяснение простыми словами"><p>{r.summary}</p></Section>
-      <Section icon={BookOpen} title="Медицинские термины" label="Объяснение простыми словами">
-        {r.terms.length === 0 ? <p className="text-muted-foreground">Термины для объяснения не найдены.</p> : (
-          <dl className="grid gap-3 sm:grid-cols-2">{r.terms.map((t) => (
+      <Section icon={FileText} title="Что указано в заключении" label="Из исходного текста">
+        <p><span className="text-muted-foreground">Вид обследования:</span> {r.examType ?? "в тексте не указан"}</p>
+        {r.findings && r.findings.length > 0 ? (
+          <ul className="mt-2 grid gap-1">{r.findings.map((f) => <li key={f} className="border-l-4 border-border bg-muted/60 px-3 py-1 italic">«{f}»</li>)}</ul>
+        ) : <p className="mt-2 text-muted-foreground">Отдельные находки не выделены.</p>}
+        <div className="mt-3">
+          {r.birads ? (
+            <div className="flex items-start gap-4">
+              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-plum font-display text-2xl text-primary-foreground">{r.birads.category}</span>
+              <div><p className="font-semibold">BI-RADS {r.birads.category}</p><p>{r.birads.meaning}</p><p className="mt-1 text-xs text-muted-foreground">Общее описание категории. Что она значит именно для вас, объяснит врач. <Link to="/knowledge" className="underline">Подробнее о BI-RADS</Link></p></div>
+            </div>
+          ) : <p className="text-muted-foreground">BI-RADS: в тексте не указано.</p>}
+        </div>
+      </Section>
+      <Section icon={Quote} title="Рекомендации врача" label="Из исходного текста">
+        {r.recommendations.length === 0 ? <p className="text-muted-foreground">В тексте заключения рекомендации не найдены.</p> : (
+          <div className="grid gap-4">{REC_KINDS.filter((k) => r.recommendations.some((q) => q.kind === k)).map((k) => (
+            <div key={k}>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{REC_KIND_LABEL[k]}</p>
+              <ul className="grid gap-2">{r.recommendations.filter((q) => q.kind === k).map((q) => (
+                <li key={q.text} className="border-l-4 border-rose bg-cream/60 px-4 py-2">
+                  <span className="italic">«{q.text}»</span>
+                  {q.passage && q.passage !== q.text && <span className="mt-1 block text-xs text-muted-foreground">Фрагмент заключения: «{q.passage}»</span>}
+                  {q.certainty && CERTAINTY_NOTE[q.certainty] && <span className="mt-1 block text-xs font-medium text-secondary-foreground">{CERTAINTY_NOTE[q.certainty]}</span>}
+                  {q.kind === "diet" && <span className="mt-1 block text-xs text-muted-foreground">Это рекомендация по питанию из заключения, а не лечение. Подробности уточните у врача.</span>}
+                </li>
+              ))}</ul>
+            </div>
+          ))}</div>
+        )}
+      </Section>
+      <Section icon={Sparkles} title="Объяснение простыми словами" label={r.source === "ai" ? "Сгенерировано AI, не указание врача" : "Демо-объяснение"}>
+        <p>{r.summary}</p>
+        {r.recommendations.some((q) => q.explanation) && (
+          <ul className="mt-3 grid gap-2">{r.recommendations.filter((q) => q.explanation).map((q) => <li key={q.text} className="rounded-2xl bg-muted p-3"><span className="font-semibold text-primary">«{q.text}»</span> — {q.explanation}</li>)}</ul>
+        )}
+        {r.terms.length > 0 && (
+          <dl className="mt-3 grid gap-3 sm:grid-cols-2">{r.terms.map((t) => (
             <div key={t.term} className="rounded-2xl bg-muted p-3"><dt className="font-semibold text-primary">{t.term}</dt><dd className="mt-1 text-muted-foreground">{t.explanation}</dd></div>
           ))}</dl>
         )}
       </Section>
-      <Section icon={ShieldCheck} title="BI-RADS" label="Общее значение категории">
-        {r.birads ? (
-          <div className="flex items-start gap-4">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-plum font-display text-2xl text-primary-foreground">{r.birads.category}</span>
-            <div><p>{r.birads.meaning}</p><p className="mt-1 text-xs text-muted-foreground">Это общее описание категории. Что она значит именно для вас, объяснит врач. <Link to="/knowledge" className="underline">Подробнее о BI-RADS</Link></p></div>
-          </div>
-        ) : <p className="text-muted-foreground">В тексте не указано.</p>}
-      </Section>
-      <Section icon={Quote} title="Что указано в рекомендациях врача" label="Из исходного текста">
-        {r.recommendations.length === 0 ? <p className="text-muted-foreground">В тексте заключения рекомендации не найдены.</p> : (
-          <ul className="grid gap-2">{r.recommendations.map((q) => (
-            <li key={q.text} className="border-l-4 border-rose bg-cream/60 px-4 py-2">
-              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground not-italic">{REC_KIND_LABEL[q.kind]}</span>
-              <span className="italic">«{q.text}»</span>
-              {q.kind === "diet" && <span className="mt-1 block text-xs text-muted-foreground">Это общая рекомендация по питанию из заключения, а не лечение. Подробности уточните у врача.</span>}
-            </li>
-          ))}</ul>
+      <Section icon={HelpCircle} title="Что можно уточнить у врача" label="Подсказки, не медицинский совет">
+        {r.uncertainties && r.uncertainties.length > 0 && (
+          <div className="mb-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Что неясно или не указано</p>
+            <ul className="mt-1 grid list-disc gap-1 pl-5">{r.uncertainties.map((u) => <li key={u}>{u}</li>)}</ul></div>
         )}
-      </Section>
-      <Section icon={HelpCircle} title="Что спросить у врача" label="Подсказки, не медицинский совет">
         <ol className="grid list-decimal gap-1 pl-5">{r.questions.map((q) => <li key={q}>{q}</li>)}</ol>
       </Section>
       <p className="text-center text-xs text-muted-foreground">{DISCLAIMER}</p>
