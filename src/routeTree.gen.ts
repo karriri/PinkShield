@@ -10,33 +10,92 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AssistantRouteImport } from './routes/assistant'
+import { Route as CalendarRouteImport } from './routes/calendar'
+import { Route as CommunityRouteImport } from './routes/community'
+import { Route as KnowledgeRouteImport } from './routes/knowledge'
+import { Route as ProfileRouteImport } from './routes/profile'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AssistantRoute = AssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CalendarRoute = CalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunityRoute = CommunityRouteImport.update({
+  id: '/community',
+  path: '/community',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KnowledgeRoute = KnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/assistant': typeof AssistantRoute
+  '/calendar': typeof CalendarRoute
+  '/community': typeof CommunityRoute
+  '/knowledge': typeof KnowledgeRoute
+  '/profile': typeof ProfileRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/assistant': typeof AssistantRoute
+  '/calendar': typeof CalendarRoute
+  '/community': typeof CommunityRoute
+  '/knowledge': typeof KnowledgeRoute
+  '/profile': typeof ProfileRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/assistant': typeof AssistantRoute
+  '/calendar': typeof CalendarRoute
+  '/community': typeof CommunityRoute
+  '/knowledge': typeof KnowledgeRoute
+  '/profile': typeof ProfileRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    '/' | '/assistant' | '/calendar' | '/community' | '/knowledge' | '/profile'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    '/' | '/assistant' | '/calendar' | '/community' | '/knowledge' | '/profile'
+  id:
+    | '__root__'
+    | '/'
+    | '/assistant'
+    | '/calendar'
+    | '/community'
+    | '/knowledge'
+    | '/profile'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AssistantRoute: typeof AssistantRoute
+  CalendarRoute: typeof CalendarRoute
+  CommunityRoute: typeof CommunityRoute
+  KnowledgeRoute: typeof KnowledgeRoute
+  ProfileRoute: typeof ProfileRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +107,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/assistant': {
+      id: '/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof AssistantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/calendar': {
+      id: '/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof CalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/community': {
+      id: '/community'
+      path: '/community'
+      fullPath: '/community'
+      preLoaderRoute: typeof CommunityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/knowledge': {
+      id: '/knowledge'
+      path: '/knowledge'
+      fullPath: '/knowledge'
+      preLoaderRoute: typeof KnowledgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AssistantRoute: AssistantRoute,
+  CalendarRoute: CalendarRoute,
+  CommunityRoute: CommunityRoute,
+  KnowledgeRoute: KnowledgeRoute,
+  ProfileRoute: ProfileRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

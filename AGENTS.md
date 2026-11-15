@@ -28,3 +28,8 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## PINK SHIELD
+- Planner/community/profile data lives in browser storage via `src/lib/store.ts` (no accounts); report text and AI results are never persisted — keeps sensitive health text off the device.
+- AI report explanations go through `src/lib/report.functions.ts` (server function); its output is post-filtered by `src/lib/report-safety.ts` so BI-RADS, terms and recommendation quotes must appear in the source text — prevents invented findings.
+- Demo reports use prepared explanations in `src/lib/demo-reports.ts` and never call the AI — deterministic demos.
