@@ -1,25 +1,156 @@
-# Data Hub connection screen for PINK SHIELD
+# Data Hub connection for PINK SHIELD (technical specification)
 
-The Data Hub itself (datasets, annotation, quality checks, splits, experiments, models, access log) is built as a **separate Lovable project with its own database**, as your brief asks. Paste the first brief into that new project. This project gets only the secure connection side.
+The Data Hub itself (datasets, annotation, quality checks, splits, experiments, model registry, access log) is a **separate Lovable project with its own database**. You build it there from brief 01. This project adds only the secure connection side. All existing PINK SHIELD pages, design and features stay as they are.
 
-## What you will see here
-- A new **«Интеграция Data Hub»** tab on the moderation page, visible to administrators only.
-- It shows the connection status, the time of the last successful sync, recent errors, and a "Повторить" button.
-- Until the Data Hub server address and a shared secret are added, it says plainly **«API не подключён»**. Nothing pretends to work.
-- A reference list of the 9 Data Hub operations (datasets, versions, imports, quality checks, annotation batches, ML jobs, models), each with what it accepts and returns.
+## What you will see
+- A new **«Интеграция Data Hub»** tab on the existing moderation page, for administrators only.
+- The tab shows the connection state, the last successful sync, recent errors, a "Повторить проверку" button, and read-only lists of datasets and models fetched from the Data Hub.
+- It shows nothing invented: no sample datasets, no fake syncs, no pretend experiments or model statuses. With no connection, it shows only the state and the reason.
 
-## Safety rules
-- Only administrators can use it, and the server checks that on every call.
-- The shared secret stays on the server. The browser never sees it or any other key.
-- Only datasets marked approved or published, with an allowed purpose, are accepted.
-- User documents, report texts and chats are never sent to the Data Hub.
-- Data Hub content never becomes a source of medical answers. The navigator keeps using only the reviewed guidance library.
-- Each call is logged with its result. Logs keep no health data.
-- Requests time out, retry with a fixed job id so nothing runs twice, and are rate limited.
+## Connection states (exactly one at a time)
+| State | When |
+|---|---|
+| `not_connected` | `DATA_HUB_API_URL` or `DATA_HUB_API_SECRET` is missing. No network call is made. |
+| `connected` | The last health check (`GET /api/data-hub/datasets?limit=1`) returned a valid 2xx response. |
+| `sync_in_progress` | A check is running. Shown in the UI only; never stored as a final result. |
+| `sync_failed` | Timeout, network error, 5xx, 429 after retries, or a response that fails schema validation. |
+| `authentication_failed` | The Data Hub answered 401 or 403. Not retried. |
 
-## Technical details
-- `src/lib/data-hub.ts`: Zod schemas for the 9 contracts (request and response types).
-- `src/lib/data-hub.functions.ts`: admin-only server functions (`requireSupabaseAuth` + `has_role`). They read `DATA_HUB_API_URL` and `DATA_HUB_API_SECRET` inside the handler. If either is missing, they return `{status:"not_connected"}` without making a network call. Otherwise they call the external API with a 10s timeout, an idempotency job_id, and 2 retries. A filter keeps only approved/published datasets with an allowed intended_use.
-- Migration: an `integration_events` table (admin read via has_role, inserts only from the server, no health payload). Rate limit: at most N calls per admin per minute, counted from that table.
-- The secrets are requested only once the Data Hub project exists and gives you its address.
-- Tests: missing settings give not_connected, the dataset filter, Zod rejecting bad input, non-admin denied.
+## API contracts (Data Hub side; this app is the client)
+All requests carry `Authorization: Bearer <DATA_HUB_API_SECRET>`, `X-Request-Id: <uuid>` and `Content-Type: application/json`. Every POST also carries `Idempotency-Key: <job_id>`. Responses are JSON.
+
+The shared error body is `{ error: { code, message, request_id } }`.
+- `400 invalid_request` — the request failed validation.
+- `401 unauthenticated` — the secret is missing or wrong.
+- `403 forbidden` — the caller lacks the needed scope, or the dataset's status or purpose is not allowed.
+- `404 not_found`
+- `409 idempotency_conflict` — the same key was sent with a different body.
+- `413 payload_too_large`
+- `415 unsupported_media_type`
+- `422 validation_failed` — schema, checksum or licence problem.
+- `429 rate_limited` — includes a `Retry-After` header.
+- `500 internal_error`
+- `503 unavailable`
+
+Shared types:
+- `DatasetStatus` = draft | in_review | approved | published | archived
+- `PrivacyClass` = public | synthetic | deidentified | restricted
+- `JobStatus` = queued | running | succeeded | failed | cancelled
+
+### 1. List allowed datasets
+`GET /api/data-hub/datasets`
+- Request (query): `?status=approved|published&intended_use=string&limit=1..100(default 50)&cursor=string`
+- Response 200: `{ items: [{ id: uuid, name, type, privacy_class, source, license, status, intended_use: string[], latest_version: string|null, updated_at: iso }], next_cursor: string|null }`
+- Errors: 400, 401, 403, 429, 5xx
+
+### 2. Dataset versions
+`GET /api/data-hub/datasets/{id}/versions`
+- Response 200: `{ dataset_id, items: [{ version, status, record_count: int>=0, schema_hash, checksum_sha256, validation_status: pending|passed|failed, provenance: string, created_at }] }`
+- Errors: 400, 401, 403, 404, 429, 5xx
+
+### 3. Create an import job
+`POST /api/data-hub/import-jobs`
+- Request: `{ job_id: uuid, dataset_id: uuid, version: string, file: { storage_path: string, mime: "text/csv"|"application/x-ndjson"|"application/json", size_bytes: int (1..524288000), checksum_sha256: hex64 }, schema_ref: string }`
+- Response 202: `{ job_id, status: "queued", created_at }`. A repeat with the same key and body returns 200 with the existing job.
+- Errors: 400, 401, 403, 409, 413, 415, 422, 429, 5xx
+
+### 4. Import job status
+`GET /api/data-hub/import-jobs/{id}`
+- Response 200: `{ job_id, status: JobStatus, rows_total: int|null, rows_accepted: int|null, rows_rejected: int|null, duplicates: int|null, errors: [{ code, message, row: int|null }] (max 100), updated_at }`
+- Errors: 401, 403, 404, 429, 5xx
+
+### 5. Start a validation job
+`POST /api/data-hub/validation-jobs`
+- Request: `{ job_id: uuid, dataset_id: uuid, version: string, checks: ("schema"|"duplicates"|"empty_fields"|"class_balance"|"split_leakage")[] (min 1) }`
+- Response 202: `{ job_id, status: "queued", created_at }`
+- Errors: 400, 401, 403, 404, 409, 429, 5xx
+
+### 6. Assign an annotation batch
+`POST /api/data-hub/annotation-jobs`
+- Request: `{ job_id: uuid, dataset_id: uuid, version: string, record_ids: uuid[] (1..1000), assignee_member_id: uuid, reviewer_member_id: uuid|null, guideline_ref: string }`
+- Response 202: `{ job_id, status: "queued", assigned: int, created_at }`
+- Errors: 400, 401, 403, 404, 409, 422, 429, 5xx
+
+### 7. Queue an ML experiment
+`POST /api/data-hub/ml-jobs`
+- Request: `{ job_id: uuid, experiment_name: string(1..120), dataset_id: uuid, version: string, split_id: uuid, model_type: string, params: Record<string, string|number|boolean> (max 50 keys) }`
+- Response 202: `{ job_id, status: "queued", created_at }`. Training runs on the Data Hub's servers, never in the browser.
+- Errors: 400, 401, 403, 404, 409, 422, 429, 5xx
+
+### 8. ML job status and metrics
+`GET /api/data-hub/ml-jobs/{id}`
+- Response 200: `{ job_id, status: JobStatus, metrics: Record<string, number>|null, artifact_uri: string|null, started_at: iso|null, finished_at: iso|null, error: string|null }`
+- The UI says "обучено" only when the status is `succeeded` and an artifact exists.
+- Errors: 401, 403, 404, 429, 5xx
+
+### 9. List models
+`GET /api/data-hub/models`
+- Request (query): `?approval_status=pending|approved|rejected|retired&limit&cursor`
+- Response 200: `{ items: [{ id, name, version, type, metrics: Record<string, number>, approval_status, dataset_version_ref, created_at }], next_cursor }`
+- Errors: 400, 401, 403, 429, 5xx
+
+### Rules on the client side
+- Every response is validated with Zod. A response that fails validation counts as `sync_failed` (`invalid_response`) and its data is dropped.
+- Datasets are kept only if their status is approved or published and their purpose is on the allow-list. Anything else is filtered out, even if the Data Hub returns it.
+- Nothing from the Data Hub feeds the navigator, the report assistant or any medical answer.
+- User documents, report texts, chats, appointments and profiles are never sent.
+
+## Security
+- `DATA_HUB_API_URL` and `DATA_HUB_API_SECRET` are server-only secrets. They are read inside server handlers, never use a `VITE_` prefix, and are never returned, logged or shown. I request them through the secure form only after the Data Hub project exists.
+- Every server function uses `requireSupabaseAuth` and then checks `has_role(userId,'admin')` through the user's own client, before any other work. Non-admins get `403 forbidden`. Hiding the tab is only a convenience.
+- The URL must be https. Redirects are not followed.
+- Rate limit: at most 30 calls per admin per minute, counted in the audit table. Above that, the call is refused locally with `rate_limited`.
+
+## Audit log
+A new table `integration_events` stores:
+- `id`, `created_at`, `actor_id` (admin uuid)
+- `operation` (one of 9 names, or health_check)
+- `job_id`, `request_id`
+- `http_status`, `outcome` (one of the 5 states, or `ok` / an error code), `duration_ms`, `attempt`
+
+It never stores request or response bodies, file names, dataset contents, health data, emails or secrets.
+
+Access rules:
+- Inserts come only from the server, through an authorized admin's own client.
+- Admins can read the table. Nobody can update or delete rows.
+
+## Retries and idempotency
+- A `job_id` (uuid v4) is created once, when the admin starts an action. It is kept with the pending action and reused on every retry, so the Data Hub's `Idempotency-Key` stops duplicate imports or ML jobs.
+- Timeout: 10 s per attempt. Up to 2 retries, with waits of 0.5 s and 1.5 s plus jitter.
+  - Retried: network errors, timeouts, 429 (honouring `Retry-After`, capped at 5 s) and 5xx.
+  - Never retried: 400, 401, 403, 404, 409, 413, 415, 422.
+- GET calls retry the same way. A POST is retried only with the same key and body.
+
+## Technical details (files)
+- `src/lib/data-hub.ts`: pure code with the Zod schemas for all 9 contracts, the states, `mapHttpToState`, `filterAllowedDatasets`, and `fetchWithRetry(fetchFn, opts)` with an injectable fetch and clock for tests.
+- `src/lib/data-hub.functions.ts`: admin-only server functions. They are `getDataHubStatus`, `listDataHubDatasets`, `listDataHubVersions`, `listDataHubModels`, `getJobStatus`, and `createJob(kind, payload with job_id)`.
+- A new migration for `integration_events`, with its grants, RLS, and an index on (actor_id, created_at).
+- `src/components/data-hub-panel.tsx`: the new tab, added to `src/routes/moderation.tsx` without changing the other tabs. It shows the state, the last success, the last 20 events, a retry button, and the dataset and model lists.
+- The job-creation buttons stay disabled with "API не подключён" until the state is `connected`.
+
+## Tests (vitest, `src/test/data-hub.test.ts`)
+- Missing URL or secret gives `not_connected`, and fetch is never called.
+- A non-admin caller is denied with `forbidden` before any fetch. A caller who is not signed in is unauthorized.
+- 401 or 403 gives `authentication_failed`, with no retry.
+- A malformed 200 body gives `sync_failed / invalid_response`, and no data is returned.
+- A timeout leads to 3 attempts, then `sync_failed / timeout`.
+- 503, then 503, then 200 gives `connected` after 3 attempts.
+- 429 waits for `Retry-After` and retries.
+- All retries of one POST send the same `Idempotency-Key` and the same body. 422 is not retried.
+- A 409 from the Data Hub is shown as a conflict, not as success.
+- The dataset filter drops draft, in_review, archived and disallowed-purpose items.
+- An audit row built from a request never contains the payload or secret fields.
+
+## Implementation checklist
+1. Add the migration for `integration_events` (grants, RLS: admin select, admin insert of their own rows only, no update or delete).
+2. Write `src/lib/data-hub.ts`: schemas, states, error mapping, filter, retry helper.
+3. Write `src/lib/data-hub.functions.ts`: auth and admin check, secret check, rate limit, call, validation, audit row.
+4. Build `src/components/data-hub-panel.tsx` and add the tab to the moderation page.
+5. Write the tests in `src/test/data-hub.test.ts` and run all tests, including the existing 32.
+6. Check that the build is clean and that the other moderation tabs, navigator, report assistant, calendar and community still work.
+7. In the browser as an admin, check that the tab shows `not_connected` and that job buttons are disabled. As a non-admin, check that a direct call is refused.
+8. Run the security scan.
+9. Record the integration rule in AGENTS.md.
+10. When the Data Hub project's address is ready, request `DATA_HUB_API_URL` and `DATA_HUB_API_SECRET` through the secure form, with Generate for the shared secret.
+
+Still waiting on you: which email should be the administrator. The tab and the admin checks can't be tested in the browser until that account exists.
