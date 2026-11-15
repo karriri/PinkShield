@@ -37,3 +37,4 @@ use the editor.
 - Recommendation extraction classifies each source sentence (explicit/conditional/uncertain vs negated/descriptive) in `report-safety.ts` — avoids false-positive "recommendations".
 - AI report explanations go through `src/lib/report.functions.ts` (server function); its output is post-filtered by `src/lib/report-safety.ts` so BI-RADS, terms and recommendation quotes must appear in the source text — prevents invented findings.
 - Demo reports use prepared explanations in `src/lib/demo-reports.ts` and never call the AI — deterministic demos.
+- Data Hub is a separate project reached only through admin-checked server functions in `src/lib/data-hub.functions.ts` (contracts, SSRF checks, retries in `src/lib/data-hub.ts`); audit rows go only through `data_hub_log_event` and are append-only — keeps secrets server-side and Data Hub content out of medical answers.
