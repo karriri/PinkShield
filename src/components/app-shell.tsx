@@ -1,5 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { BookOpen, CalendarHeart, Home, MessagesSquare, Sparkles, User, Shield } from "lucide-react";
+import { BookOpen, CalendarHeart, Home, LogIn, LogOut, MessagesSquare, Sparkles, User, Shield, Gavel } from "lucide-react";
+import { NotificationBell } from "@/components/notification-bell";
+import { Button } from "@/components/ui/button";
+import { useAuth, useIsAdmin, useMyProfile, useSignOut, useTimezoneSync } from "@/lib/auth";
 import type { ReactNode } from "react";
 
 const NAV = [
@@ -22,7 +25,24 @@ function Logo() {
   );
 }
 
+function Account() {
+  const { userId, ready } = useAuth();
+  const { data: profile } = useMyProfile();
+  const signOut = useSignOut();
+  if (!ready) return null;
+  if (!userId) return <Button size="sm" variant="outline" asChild><Link to="/auth"><LogIn /> Войти</Link></Button>;
+  return (
+    <div className="flex items-center gap-1">
+      <NotificationBell />
+      <span className="hidden max-w-28 truncate text-sm font-medium sm:inline">{profile?.pseudonym}</span>
+      <Button size="icon" variant="ghost" aria-label="Выйти" onClick={signOut}><LogOut /></Button>
+    </div>
+  );
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
+  useTimezoneSync();
+  const { data: isAdmin } = useIsAdmin();
   return (
     <div className="min-h-screen bg-background">
       <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar p-5 lg:flex">
@@ -36,7 +56,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Icon className="h-4 w-4" />{label}
             </Link>
           ))}
+          {isAdmin && (
+            <Link to="/moderation" className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+              activeProps={{ className: "bg-sidebar-accent text-sidebar-accent-foreground" }}><Gavel className="h-4 w-4" />Модерация</Link>
+          )}
         </nav>
+        <div className="mt-6"><Account /></div>
         <div className="mt-auto rounded-2xl bg-blush p-4 text-xs leading-relaxed text-secondary-foreground">
           PINK SHIELD — образовательный проект. Он не ставит диагноз и не заменяет консультацию врача.
         </div>
@@ -44,6 +69,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/90 px-4 py-3 backdrop-blur lg:hidden">
         <Logo />
+        <div className="flex items-center gap-1">
+          {isAdmin && <Button size="icon" variant="ghost" asChild aria-label="Модерация"><Link to="/moderation"><Gavel /></Link></Button>}
+          <Account />
+        </div>
       </header>
 
       <main className="px-4 pb-28 pt-6 sm:px-6 lg:ml-64 lg:px-10 lg:pb-12 lg:pt-10">

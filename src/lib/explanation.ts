@@ -1,8 +1,9 @@
+import type { Recommendation } from "./report-safety";
 export type Explanation = {
   summary: string;
   terms: { term: string; explanation: string }[];
   birads: { category: string; meaning: string } | null;
-  recommendations: string[]; // verbatim quotes from the report
+  recommendations: Recommendation[]; // wording taken from the report, verified
   questions: string[];
   personalConcern: boolean; // user describes a new personal change (context-aware)
   source: "demo" | "ai";

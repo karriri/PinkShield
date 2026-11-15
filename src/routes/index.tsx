@@ -1,13 +1,15 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowRight, CalendarHeart, Heart, Lightbulb, MessageCircle, Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DemoBadge } from "@/components/app-shell";
 import { AppointmentDialog } from "@/components/appointment-dialog";
-import { formatDate, splitAppointments, useAppointments } from "@/lib/appointments";
+import { toast } from "sonner";
+import { formatDate, groupAppointments, useAppointmentActions, useAppointments } from "@/lib/appointments";
 import { usePosts, timeAgo } from "@/lib/community";
-import { logActivity, useProfile } from "@/lib/profile";
-import { uid } from "@/lib/store";
+import { useAuth, useMyProfile } from "@/lib/auth";
+import { NoticeList } from "@/components/notification-bell";
+import { MigrateCard } from "@/components/migrate-card";
 import hero from "@/assets/hero.jpg";
 
 export const Route = createFileRoute("/")({
@@ -17,28 +19,34 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Ваш спутник в заботе о здоровье груди: ближайшие обследования, AI-помощник и поддержка сообщества." },
       { property: "og:title", content: "PINK SHIELD — Главная" },
       { property: "og:description", content: "Забота о здоровье начинается с маленьких шагов." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Home,
 });
 
 function Home() {
-  const [appts, setAppts] = useAppointments();
-  const [posts] = usePosts();
-  const [profile, setProfile] = useProfile();
+  const { userId } = useAuth();
+  const navigate = useNavigate();
+  const { data: appts = [] } = useAppointments();
+  const { data: posts = [] } = usePosts();
+  const { data: profile } = useMyProfile();
+  const act = useAppointmentActions();
   const [open, setOpen] = useState(false);
-  const { upcoming } = splitAppointments(appts);
+  const { upcoming } = groupAppointments(appts);
   const next = upcoming[0];
 
   return (
     <div className="grid gap-6">
+      <MigrateCard />
       <section className="relative overflow-hidden rounded-[2rem] bg-hero p-8 shadow-soft sm:p-10">
         <div className="relative z-10 max-w-md lg:max-w-lg">
-          <p className="text-sm font-medium text-rose">Здравствуйте, {profile.name}</p>
+          <p className="text-sm font-medium text-rose">{profile ? `Здравствуйте, ${profile.pseudonym}` : "Здравствуйте"}</p>
           <h1 className="mt-2 text-4xl font-semibold leading-tight text-primary sm:text-5xl">Добро пожаловать в PINK SHIELD</h1>
           <p className="mt-3 text-muted-foreground">Забота о здоровье начинается с маленьких шагов.</p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Button size="lg" onClick={() => setOpen(true)}><Plus /> Добавить обследование</Button>
+            <Button size="lg" onClick={() => (userId ? setOpen(true) : navigate({ to: "/auth" }))}><Plus /> Добавить обследование</Button>
             <Button size="lg" variant="outline" asChild><Link to="/assistant"><Sparkles /> Разобрать заключение</Link></Button>
           </div>
         </div>
@@ -52,7 +60,7 @@ function Home() {
           {next ? (
             <>
               <h2 className="mt-3 text-3xl font-semibold">{next.type}</h2>
-              <p className="mt-1 opacity-90">{formatDate(next)}, {next.time}{next.place && ` · ${next.place}`}</p>
+              <p className="mt-1 opacity-90">{formatDate(next)}, {next.start_time.slice(0, 5)}{next.place && ` · ${next.place}`}</p>
               {next.notes && <p className="mt-3 text-sm opacity-80">{next.notes}</p>}
             </>
           ) : (
@@ -73,14 +81,14 @@ function Home() {
         <section className="rounded-3xl border border-border bg-card p-6 shadow-soft lg:col-span-2">
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-semibold text-primary">Обсуждения в сообществе</h2>
-            <DemoBadge>Демо-контент</DemoBadge>
+            {!userId && <DemoBadge>Демо-контент</DemoBadge>}
           </div>
           <ul className="mt-4 divide-y divide-border">
             {posts.slice(0, 3).map((p) => (
               <li key={p.id} className="py-3">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="font-semibold text-foreground">{p.author}</span>· {p.category} · {timeAgo(p.at)}</div>
-                <p className="mt-1 line-clamp-2 text-sm">{p.text}</p>
-                <div className="mt-1 flex gap-4 text-xs text-muted-foreground"><span className="flex items-center gap-1"><Heart className="h-3 w-3" />{p.likes}</span><span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" />{p.comments.length}</span></div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="font-semibold text-foreground">{p.author_name}</span>· {p.category} · {timeAgo(p.created_at)}</div>
+                <p className="mt-1 line-clamp-2 text-sm">{p.body}</p>
+                <div className="mt-1 flex gap-4 text-xs text-muted-foreground"><span className="flex items-center gap-1"><Heart className="h-3 w-3" />{p.likes_count}</span><span className="flex items-center gap-1"><MessageCircle className="h-3 w-3" />{p.comments.length}</span></div>
               </li>
             ))}
           </ul>
@@ -94,22 +102,13 @@ function Home() {
             <a className="mt-2 inline-block text-xs text-muted-foreground underline" href="https://www.cancer.org/cancer/types/breast-cancer.html" target="_blank" rel="noreferrer">Источник: American Cancer Society</a>
           </section>
           <section className="rounded-3xl border border-border bg-card p-6 shadow-soft">
-            <h2 className="text-xl font-semibold text-primary">Недавние действия</h2>
-            {profile.activity.length === 0 ? (
-              <p className="mt-2 text-sm text-muted-foreground">Здесь появятся ваши последние шаги в приложении.</p>
-            ) : (
-              <ul className="mt-2 grid gap-2 text-sm">
-                {profile.activity.slice(0, 4).map((a, i) => <li key={i} className="flex justify-between gap-2"><span>{a.text}</span><span className="shrink-0 text-xs text-muted-foreground">{timeAgo(a.at)}</span></li>)}
-              </ul>
-            )}
+            <h2 className="mb-3 text-xl font-semibold text-primary">Напоминания</h2>
+            {userId ? <NoticeList compact /> : <p className="text-sm text-muted-foreground"><Link to="/auth" className="underline">Войдите</Link>, чтобы получать напоминания о визитах.</p>}
           </section>
         </div>
       </div>
 
-      <AppointmentDialog open={open} onOpenChange={setOpen} onSave={(d) => {
-        setAppts((l) => [...l, { ...d, id: uid(), completed: false }]);
-        logActivity(setProfile, `Добавлено: ${d.type}`);
-      }} />
+      <AppointmentDialog open={open} onOpenChange={setOpen} onSave={async (d) => { await act.save(d); toast.success("Обследование добавлено"); }} />
     </div>
   );
 }

@@ -1,41 +1,96 @@
-import { usePersistent, uid } from "./store";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
+import { useAuth } from "./auth";
 
 export const CATEGORIES = ["Мой опыт", "Вопрос врачу", "Поддержка", "Диагностика", "Во время лечения", "После лечения"] as const;
 export type Category = (typeof CATEGORIES)[number];
-export type Comment = { id: string; author: string; text: string; at: number };
-export type Post = {
-  id: string; author: string; category: Category; text: string; at: number;
-  likes: number; liked: boolean; comments: Comment[]; reported: boolean; demo?: boolean;
-};
 
-const h = (n: number) => Date.now() - n * 3600_000;
+export const REPORT_REASONS = {
+  bullying: "Травля или преследование",
+  insults: "Оскорбления, грубые выражения",
+  threats: "Угрозы",
+  spam: "Спам или реклама",
+  misinformation: "Ложная информация под видом медицинского факта",
+  harmful: "Неуместный или опасный контент",
+  other: "Другое нарушение правил",
+} as const;
+export type ReportReason = keyof typeof REPORT_REASONS;
 
-export function seedPosts(): Post[] {
-  return [
-    { id: uid(), author: "Лилия_Р", category: "Мой опыт", at: h(3), likes: 24, liked: false, reported: false, demo: true,
-      text: "Сегодня впервые прошла маммографию. Очень боялась, а всё заняло минут 15. Девочки, не откладывайте — страх намного больше, чем сама процедура.",
-      comments: [{ id: uid(), author: "Мира", text: "Спасибо, что поделились! Я как раз записана на следующей неделе.", at: h(2) }] },
-    { id: uid(), author: "Тихая_Волна", category: "Вопрос врачу", at: h(8), likes: 11, liked: false, reported: false, demo: true,
-      text: "В заключении написали «BI-RADS 3». Как вы готовились к разговору с врачом? Какие вопросы задавали?",
-      comments: [{ id: uid(), author: "Анна_К", text: "Я записала вопросы заранее в AI-помощнике и взяла с собой. Очень помогло не растеряться.", at: h(6) }] },
-    { id: uid(), author: "Солнце_88", category: "Во время лечения", at: h(26), likes: 47, liked: false, reported: false, demo: true,
-      text: "Третий месяц терапии. Хочу сказать всем, кто сейчас в начале пути: бывают тяжёлые дни, но вы не одни. Обнимаю каждую.",
-      comments: [] },
-    { id: uid(), author: "Вера_Н", category: "После лечения", at: h(50), likes: 63, liked: false, reported: false, demo: true,
-      text: "Два года в ремиссии! Продолжаю наблюдение у врача и учусь снова радоваться простым вещам.",
-      comments: [{ id: uid(), author: "Лилия_Р", text: "Какая чудесная новость! 💗", at: h(48) }] },
-    { id: uid(), author: "Нежность", category: "Поддержка", at: h(70), likes: 19, liked: false, reported: false, demo: true,
-      text: "Как вы справляетесь с тревогой в ожидании результатов? Мне помогает гулять и не гуглить симптомы.",
-      comments: [] },
-  ];
-}
+export const COMMUNITY_RULES = [
+  "Никакой травли, преследования и дискриминации.",
+  "Никаких угроз и личных нападок.",
+  "Не публикуйте чужую медицинскую информацию и личные данные.",
+  "Не выдавайте личный опыт за гарантированный медицинский совет.",
+  "Не распространяйте опасную медицинскую дезинформацию.",
+  "Общайтесь с уважением и бережностью.",
+];
+
+export type Comment = Tables<"comments">;
+export type Post = Tables<"posts"> & { comments: Comment[] };
 
 export function usePosts() {
-  return usePersistent<Post[]>("ps.posts", seedPosts);
+  const { userId, ready } = useAuth();
+  return useQuery({
+    queryKey: ["posts", userId],
+    enabled: ready,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("posts").select("*, comments(*)").order("created_at", { ascending: false }).limit(100);
+      if (error) throw error;
+      return (data as Post[]).map((p) => ({ ...p, comments: [...p.comments].sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at)) }));
+    },
+  });
 }
 
-export function timeAgo(at: number) {
-  const m = Math.round((Date.now() - at) / 60000);
+export function useMyLikes() {
+  const { userId } = useAuth();
+  return useQuery({
+    queryKey: ["likes", userId], enabled: !!userId,
+    queryFn: async () => new Set(((await supabase.from("post_likes").select("post_id")).data ?? []).map((r) => r.post_id)),
+  });
+}
+
+export function useBlocks() {
+  const { userId } = useAuth();
+  return useQuery({
+    queryKey: ["blocks", userId], enabled: !!userId,
+    queryFn: async () => (await supabase.from("blocks").select("*").order("created_at", { ascending: false })).data ?? [],
+  });
+}
+
+export function useCommunityActions() {
+  const qc = useQueryClient();
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["posts"] }); qc.invalidateQueries({ queryKey: ["likes"] }); };
+  const check = (e: { message: string } | null) => { refresh(); if (e) throw new Error(e.message); };
+  return {
+    async createPost(category: Category, body: string) { check((await supabase.from("posts").insert({ category, body, author_name: "" })).error); },
+    async editPost(id: string, category: Category, body: string) { check((await supabase.from("posts").update({ category, body }).eq("id", id)).error); },
+    async deletePost(id: string) { check((await supabase.from("posts").delete().eq("id", id)).error); },
+    async comment(post_id: string, body: string, parent_id?: string) { check((await supabase.from("comments").insert({ post_id, body, parent_id: parent_id ?? null, author_name: "" })).error); },
+    async editComment(id: string, body: string) { check((await supabase.from("comments").update({ body }).eq("id", id)).error); },
+    async deleteComment(id: string) { check((await supabase.from("comments").delete().eq("id", id)).error); },
+    async toggleLike(post_id: string, liked: boolean) {
+      check(liked ? (await supabase.from("post_likes").delete().eq("post_id", post_id)).error : (await supabase.from("post_likes").insert({ post_id })).error);
+    },
+    async report(target: { post_id?: string; comment_id?: string }, reason: ReportReason, note: string) {
+      const { error } = await supabase.from("content_reports").insert({ ...target, reason, note: note.trim().slice(0, 500) });
+      if (error) throw new Error(error.message);
+    },
+    async block(blocked_id: string, blocked_name: string) {
+      const { error } = await supabase.from("blocks").insert({ blocked_id, blocked_name });
+      qc.invalidateQueries({ queryKey: ["blocks"] }); refresh();
+      if (error && !error.message.includes("duplicate")) throw new Error(error.message);
+    },
+    async unblock(blocked_id: string) {
+      await supabase.from("blocks").delete().eq("blocked_id", blocked_id);
+      qc.invalidateQueries({ queryKey: ["blocks"] }); refresh();
+    },
+  };
+}
+
+export function timeAgo(at: number | string) {
+  const t = typeof at === "string" ? new Date(at).getTime() : at;
+  const m = Math.round((Date.now() - t) / 60000);
   if (m < 1) return "только что";
   if (m < 60) return `${m} мин назад`;
   const hrs = Math.round(m / 60);

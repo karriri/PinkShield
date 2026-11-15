@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { Explanation } from "./explanation";
 import { BIRADS_MEANING } from "./explanation";
-import { verifyBirads, verifyQuotes, verifyTerms } from "./report-safety";
+import { buildRecommendations, verifyBirads, verifyTerms } from "./report-safety";
 
 const SYSTEM = `Ты — образовательный помощник PINK SHIELD. Объясняешь медицинские заключения о молочных железах простым, спокойным русским языком.
 Строгие правила:
@@ -10,7 +10,7 @@ const SYSTEM = `Ты — образовательный помощник PINK SH
 - Никогда не ставь диагноз, не оценивай вероятность рака, не советуй лечение или лекарства, не говори откладывать визит к врачу.
 - terms: только термины, которые дословно встречаются в тексте (копируй их точно как в тексте).
 - birads: только если категория BI-RADS явно написана в тексте, иначе null. Не выводи категорию сам.
-- recommendations: дословные цитаты рекомендаций врача из текста. Если рекомендаций нет — пустой массив. Не придумывай рекомендации.
+- recommendations: ВСЕ явные рекомендации из текста, каждая отдельным элементом — контроль и повторные обследования, консультации специалистов, питание (например «увеличить потребление белка»), образ жизни и любые другие. text — дословная цитата из текста без изменений слов; kind — follow_up | consultation | diet | lifestyle | other. Не пропускай рекомендации, не связанные с BI-RADS. Если рекомендаций нет — пустой массив. Не придумывай и не добавляй своих рекомендаций. Не трактуй советы по питанию как лечение рака.
 - questions: 3–5 нейтральных вопросов, которые можно задать врачу.
 - personal_concern: true ТОЛЬКО если автор текста от первого лица описывает новое или текущее личное изменение (например «я нащупала уплотнение», «у меня появились выделения»). Описания врача и отрицания («образований не выявлено») — это false.
 - Если текст не похож на медицинское заключение, честно скажи об этом в summary и оставь остальные поля пустыми.`;
@@ -31,7 +31,15 @@ const schema = {
       },
     },
     birads: { type: ["string", "null"] },
-    recommendations: { type: "array", items: { type: "string" } },
+    recommendations: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["text", "kind"],
+        properties: { text: { type: "string" }, kind: { type: "string", enum: ["follow_up", "consultation", "diet", "lifestyle", "other"] } },
+      },
+    },
     questions: { type: "array", items: { type: "string" } },
     personal_concern: { type: "boolean" },
   },
@@ -41,7 +49,7 @@ type Raw = {
   summary: string;
   terms: { term: string; explanation: string }[];
   birads: string | null;
-  recommendations: string[];
+  recommendations: { text: string; kind: string }[];
   questions: string[];
   personal_concern: boolean;
 };
@@ -77,7 +85,7 @@ export const explainReport = createServerFn({ method: "POST" })
           summary: raw.summary,
           terms: verifyTerms(data.text, raw.terms),
           birads: cat && key ? { category: cat, meaning: (BIRADS_MEANING as Record<string, string>)[key] ?? "" } : null,
-          recommendations: verifyQuotes(data.text, raw.recommendations),
+          recommendations: buildRecommendations(data.text, raw.recommendations),
           questions: raw.questions.slice(0, 5),
           personalConcern: raw.personal_concern,
         },

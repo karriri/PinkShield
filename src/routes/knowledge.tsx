@@ -4,7 +4,9 @@ import { Bookmark, BookmarkCheck, ExternalLink, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/app-shell";
 import { ARTICLES } from "@/lib/articles";
-import { useProfile } from "@/lib/profile";
+import { useSavedArticles, useToggleSaved } from "@/lib/profile";
+import { useAuth } from "@/lib/auth";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/knowledge")({
   head: () => ({
@@ -13,15 +15,19 @@ export const Route = createFileRoute("/knowledge")({
       { name: "description", content: "Простые статьи о здоровье молочных желёз: маммография, УЗИ, BI-RADS, факторы риска и мифы." },
       { property: "og:title", content: "База знаний — PINK SHIELD" },
       { property: "og:description", content: "Понятная информация о здоровье груди со ссылками на источники." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: KnowledgePage,
 });
 
 function KnowledgePage() {
-  const [profile, setProfile] = useProfile();
+  const { userId } = useAuth();
+  const { data: savedIds = [] } = useSavedArticles();
+  const toggle = useToggleSaved();
   const [openId, setOpenId] = useState<string | null>(ARTICLES[0]?.id ?? null);
-  const toggleSave = (id: string) => setProfile((p) => ({ ...p, saved: p.saved.includes(id) ? p.saved.filter((x) => x !== id) : [...p.saved, id] }));
+  const toggleSave = (id: string) => (userId ? toggle(id, savedIds.includes(id)) : toast("Войдите, чтобы сохранять статьи"));
 
   return (
     <>
@@ -32,7 +38,7 @@ function KnowledgePage() {
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         {ARTICLES.map((a) => {
-          const saved = profile.saved.includes(a.id);
+          const saved = savedIds.includes(a.id);
           const open = openId === a.id;
           return (
             <article key={a.id} id={a.id} className={`rounded-3xl border bg-card p-6 shadow-soft ${open ? "border-rose md:col-span-2" : "border-border"}`}>

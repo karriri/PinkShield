@@ -11,10 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AssistantRouteImport } from './routes/assistant'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CalendarRouteImport } from './routes/calendar'
 import { Route as CommunityRouteImport } from './routes/community'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
+import { Route as ModerationRouteImport } from './routes/moderation'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -24,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const AssistantRoute = AssistantRouteImport.update({
   id: '/assistant',
   path: '/assistant',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CalendarRoute = CalendarRouteImport.update({
@@ -41,61 +49,102 @@ const KnowledgeRoute = KnowledgeRouteImport.update({
   path: '/knowledge',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ModerationRoute = ModerationRouteImport.update({
+  id: '/moderation',
+  path: '/moderation',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/auth': typeof AuthRoute
   '/calendar': typeof CalendarRoute
   '/community': typeof CommunityRoute
   '/knowledge': typeof KnowledgeRoute
+  '/moderation': typeof ModerationRoute
   '/profile': typeof ProfileRoute
+  '/reset-password': typeof ResetPasswordRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/auth': typeof AuthRoute
   '/calendar': typeof CalendarRoute
   '/community': typeof CommunityRoute
   '/knowledge': typeof KnowledgeRoute
+  '/moderation': typeof ModerationRoute
   '/profile': typeof ProfileRoute
+  '/reset-password': typeof ResetPasswordRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/assistant': typeof AssistantRoute
+  '/auth': typeof AuthRoute
   '/calendar': typeof CalendarRoute
   '/community': typeof CommunityRoute
   '/knowledge': typeof KnowledgeRoute
+  '/moderation': typeof ModerationRoute
   '/profile': typeof ProfileRoute
+  '/reset-password': typeof ResetPasswordRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/assistant' | '/calendar' | '/community' | '/knowledge' | '/profile'
+    | '/'
+    | '/assistant'
+    | '/auth'
+    | '/calendar'
+    | '/community'
+    | '/knowledge'
+    | '/moderation'
+    | '/profile'
+    | '/reset-password'
   fileRoutesByTo: FileRoutesByTo
   to:
-    '/' | '/assistant' | '/calendar' | '/community' | '/knowledge' | '/profile'
+    | '/'
+    | '/assistant'
+    | '/auth'
+    | '/calendar'
+    | '/community'
+    | '/knowledge'
+    | '/moderation'
+    | '/profile'
+    | '/reset-password'
   id:
     | '__root__'
     | '/'
     | '/assistant'
+    | '/auth'
     | '/calendar'
     | '/community'
     | '/knowledge'
+    | '/moderation'
     | '/profile'
+    | '/reset-password'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AssistantRoute: typeof AssistantRoute
+  AuthRoute: typeof AuthRoute
   CalendarRoute: typeof CalendarRoute
   CommunityRoute: typeof CommunityRoute
   KnowledgeRoute: typeof KnowledgeRoute
+  ModerationRoute: typeof ModerationRoute
   ProfileRoute: typeof ProfileRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -112,6 +161,13 @@ declare module '@tanstack/react-router' {
       path: '/assistant'
       fullPath: '/assistant'
       preLoaderRoute: typeof AssistantRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/calendar': {
@@ -135,11 +191,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/moderation': {
+      id: '/moderation'
+      path: '/moderation'
+      fullPath: '/moderation'
+      preLoaderRoute: typeof ModerationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/profile': {
       id: '/profile'
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -148,10 +218,13 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AssistantRoute: AssistantRoute,
+  AuthRoute: AuthRoute,
   CalendarRoute: CalendarRoute,
   CommunityRoute: CommunityRoute,
   KnowledgeRoute: KnowledgeRoute,
+  ModerationRoute: ModerationRoute,
   ProfileRoute: ProfileRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -10,7 +10,6 @@ import { PageHeader, DemoBadge } from "@/components/app-shell";
 import { DEMO_REPORTS } from "@/lib/demo-reports";
 import type { Explanation } from "@/lib/explanation";
 import { explainReport } from "@/lib/report.functions";
-import { logActivity, useProfile } from "@/lib/profile";
 
 export const Route = createFileRoute("/assistant")({
   head: () => ({
@@ -36,7 +35,6 @@ function AssistantPage() {
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const explain = useServerFn(explainReport);
-  const [, setProfile] = useProfile();
 
   const demo = DEMO_REPORTS.find((d) => d.id === demoId && d.text === text);
 
@@ -56,13 +54,13 @@ function AssistantPage() {
 
   async function submit() {
     setError(null); setResult(null);
-    if (demo) { setResult(demo.explanation); logActivity(setProfile, "Разобран демо-пример заключения"); return; }
+    if (demo) { setResult(demo.explanation); return; }
     if (text.trim().length < 20) { setError("Вставьте текст заключения (минимум 20 символов)."); return; }
     if (!consent) { setError("Подтвердите согласие на отправку текста AI-сервису."); return; }
     setLoading(true);
     try {
       const r = await explain({ data: { text } });
-      if (r.ok) { setResult(r.result); logActivity(setProfile, "Разобрано заключение с AI-помощником"); }
+      if (r.ok) { setResult(r.result); }
       else setError(r.error);
     } catch {
       setError("Не удалось получить объяснение. Попробуйте ещё раз.");
@@ -169,8 +167,14 @@ function ResultView({ r }: { r: Explanation }) {
         ) : <p className="text-muted-foreground">В тексте не указано.</p>}
       </Section>
       <Section icon={Quote} title="Что указано в рекомендациях врача" label="Из исходного текста">
-        {r.recommendations.length === 0 ? <p className="text-muted-foreground">В тексте рекомендации не указаны.</p> : (
-          <ul className="grid gap-2">{r.recommendations.map((q) => <li key={q} className="border-l-4 border-rose bg-cream/60 px-4 py-2 italic">«{q}»</li>)}</ul>
+        {r.recommendations.length === 0 ? <p className="text-muted-foreground">В тексте заключения рекомендации не найдены.</p> : (
+          <ul className="grid gap-2">{r.recommendations.map((q) => (
+            <li key={q.text} className="border-l-4 border-rose bg-cream/60 px-4 py-2">
+              <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground not-italic">{REC_KIND_LABEL[q.kind]}</span>
+              <span className="italic">«{q.text}»</span>
+              {q.kind === "diet" && <span className="mt-1 block text-xs text-muted-foreground">Это общая рекомендация по питанию из заключения, а не лечение. Подробности уточните у врача.</span>}
+            </li>
+          ))}</ul>
         )}
       </Section>
       <Section icon={HelpCircle} title="Что спросить у врача" label="Подсказки, не медицинский совет">

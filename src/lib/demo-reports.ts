@@ -22,7 +22,7 @@ export const DEMO_REPORTS: DemoReport[] = [
         { term: "Регионарные лимфоузлы", explanation: "Ближайшие лимфатические узлы, например в подмышечной области." },
       ],
       birads: { category: "1", meaning: BIRADS_MEANING["1"] },
-      recommendations: ["плановое обследование по согласованию с лечащим врачом"],
+      recommendations: [{ text: "плановое обследование по согласованию с лечащим врачом", kind: "follow_up" }],
       questions: [
         "Когда мне стоит пройти следующее обследование?",
         "Какой метод обследования подходит мне по возрасту?",
@@ -50,7 +50,7 @@ export const DEMO_REPORTS: DemoReport[] = [
         { term: "Микрокальцинатов", explanation: "Мельчайших отложений кальция. В тексте указано, что их не найдено." },
       ],
       birads: { category: "2", meaning: BIRADS_MEANING["2"] },
-      recommendations: ["консультация маммолога"],
+      recommendations: [{ text: "консультация маммолога", kind: "consultation" }],
       questions: [
         "Нужно ли как-то наблюдать эту кисту?",
         "Может ли киста меняться со временем и как я это замечу?",
@@ -78,7 +78,7 @@ export const DEMO_REPORTS: DemoReport[] = [
         { term: "Фиброаденома", explanation: "Распространённое доброкачественное образование. Знак вопроса означает, что это предположение врача." },
       ],
       birads: { category: "3", meaning: BIRADS_MEANING["3"] },
-      recommendations: ["контрольное УЗИ через 6 месяцев"],
+      recommendations: [{ text: "контрольное УЗИ через 6 месяцев", kind: "follow_up" }],
       questions: [
         "Что именно вы будете сравнивать на контрольном УЗИ?",
         "При каких изменениях мне стоит прийти раньше срока?",
